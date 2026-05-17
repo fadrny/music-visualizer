@@ -13,5 +13,94 @@
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
-    
+
+    <repositories>
+        <repository>
+            <id>tarsos-dsp-repo</id>
+            <url>https://mvn.0110.be/releases</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <!-- LWJGL Core -->
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl</artifactId>
+            <version>3.2.3</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/libs/lwjgl-stable-2019-09-19-custom/lwjgl.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl</artifactId>
+            <version>3.2.3</version>
+            <classifier>natives-windows</classifier>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/libs/lwjgl-stable-2019-09-19-custom/lwjgl-natives-windows.jar</systemPath>
+        </dependency>
+
+        <!-- LWJGL GLFW -->
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl-glfw</artifactId>
+            <version>3.2.3</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/libs/lwjgl-stable-2019-09-19-custom/lwjgl-glfw.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl-glfw</artifactId>
+            <version>3.2.3</version>
+            <classifier>natives-windows</classifier>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/libs/lwjgl-stable-2019-09-19-custom/lwjgl-glfw-natives-windows.jar</systemPath>
+        </dependency>
+
+        <!-- LWJGL OpenGL -->
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl-opengl</artifactId>
+            <version>3.2.3</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/libs/lwjgl-stable-2019-09-19-custom/lwjgl-opengl.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl-opengl</artifactId>
+            <version>3.2.3</version>
+            <classifier>natives-windows</classifier>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/libs/lwjgl-stable-2019-09-19-custom/lwjgl-opengl-natives-windows.jar</systemPath>
+        </dependency>
+
+        <!-- LWJGL STB -->
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl-stb</artifactId>
+            <version>3.2.3</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/libs/lwjgl-stable-2019-09-19-custom/lwjgl-stb.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl-stb</artifactId>
+            <version>3.2.3</version>
+            <classifier>natives-windows</classifier>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/libs/lwjgl-stable-2019-09-19-custom/lwjgl-stb-natives-windows.jar</systemPath>
+        </dependency>
+
+        <!-- TarsosDSP Core -->
+        <dependency>
+            <groupId>be.tarsos.dsp</groupId>
+            <artifactId>core</artifactId>
+            <version>2.5</version>
+        </dependency>
+        <!-- TarsosDSP JVM -->
+        <dependency>
+            <groupId>be.tarsos.dsp</groupId>
+            <artifactId>jvm</artifactId>
+            <version>2.5</version>
+        </dependency>
+    </dependencies>
 </project>

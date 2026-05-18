@@ -29,7 +29,7 @@ import static org.lwjgl.system.MemoryUtil.*;
 /**
  * Interactive Audio-Reactive Topography
  *
- * 3D grid deformed by audio FFT data in real-time.
+ * 3D disc deformed by audio FFT data in real-time.
  *
  * @author Marek Fadrný
  */
@@ -44,17 +44,21 @@ public class Main {
     boolean mouseButton1 = false;
 
     // OpenGL objects
-    OGLBuffers gridBuffers;
+    OGLBuffers discBuffers;
     OGLTextRenderer textRenderer;
     int shaderProgram;
-    int locMat;
+    int locMat, locFFT, locAmplitude, locTime;
 
-    // Camera & Projection
+    // Camera + Projection
     Camera cam = new Camera();
     Mat4 proj = new Mat4PerspRH(Math.PI / 4, 1, 0.01, 1000.0);
 
+    // Audio
+    AudioFFT audioFFT;
+
     // State
     boolean wireframe = false;
+    float amplitude = 1.5f;
 
     private void init() {
         GLFWErrorCallback.createPrint(System.err).set();
@@ -66,7 +70,7 @@ public class Main {
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
-        window = glfwCreateWindow(width, height, "Audio-Reactive Topography", NULL, NULL);
+        window = glfwCreateWindow(width, height, "Vinyl music visualizer", NULL, NULL);
         if (window == NULL)
             throw new RuntimeException("Failed to create the GLFW window");
 
@@ -77,18 +81,16 @@ public class Main {
 
             if (action == GLFW_PRESS || action == GLFW_REPEAT) {
                 switch (key) {
-                    case GLFW_KEY_W: cam = cam.forward(1); break;
-                    case GLFW_KEY_S: cam = cam.backward(1); break;
-                    case GLFW_KEY_A: cam = cam.left(1); break;
-                    case GLFW_KEY_D: cam = cam.right(1); break;
-                    case GLFW_KEY_LEFT_SHIFT: cam = cam.up(1); break;
-                    case GLFW_KEY_LEFT_CONTROL: cam = cam.down(1); break;
-                    case GLFW_KEY_SPACE:
-                        cam = cam.withFirstPerson(!cam.getFirstPerson());
-                        break;
-                    case GLFW_KEY_R: cam = cam.mulRadius(0.9f); break;
-                    case GLFW_KEY_F: cam = cam.mulRadius(1.1f); break;
+                    case GLFW_KEY_W: cam = cam.forward(.2); break;
+                    case GLFW_KEY_S: cam = cam.backward(.2); break;
+                    case GLFW_KEY_A: cam = cam.left(.2); break;
+                    case GLFW_KEY_D: cam = cam.right(.2); break;
                     case GLFW_KEY_TAB: wireframe = !wireframe; break;
+                    case GLFW_KEY_KP_ADD:
+                    case GLFW_KEY_EQUAL: amplitude = Math.min(amplitude + 0.1f, 5f); break;
+                    case GLFW_KEY_KP_SUBTRACT:
+                    case GLFW_KEY_MINUS: amplitude = Math.max(amplitude - 0.1f, 0f); break;
+                    case GLFW_KEY_M: audioFFT.nextDevice(); break;
                 }
             }
         });
@@ -165,61 +167,77 @@ public class Main {
         OGLUtils.printOGLparameters();
 
         // Background
-        glClearColor(0.02f, 0.0f, 0.05f, 1.0f); // very dark purple
+        glClearColor(0.01f, 0.0f, 0.03f, 1.0f);
 
-        // Grid geometry
-        createGridBuffers();
+        // Disc geometry
+        createDiscBuffers();
 
         // Shaders
         shaderProgram = ShaderUtils.loadProgram("/shaders/terrain");
         glUseProgram(shaderProgram);
         locMat = glGetUniformLocation(shaderProgram, "mat");
+        locFFT = glGetUniformLocation(shaderProgram, "uFFT");
+        locAmplitude = glGetUniformLocation(shaderProgram, "uAmplitude");
+        locTime = glGetUniformLocation(shaderProgram, "uTime");
 
         // Camera
-        cam = cam.withPosition(new Vec3D(5, 5, 4))
+        cam = cam.withPosition(new Vec3D(4, 6, 3))
                  .withAzimuth(Math.PI * 1.25)
-                 .withZenith(Math.PI * -0.15);
+                 .withZenith(Math.PI * -0.20);
 
         // OpenGL state
         glDisable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
+        glEnable(GL_LINE_SMOOTH);
 
         // Projection (initial)
         proj = new Mat4PerspRH(Math.PI / 4, height / (double) width, 0.01, 1000.0);
 
         // Text renderer
         textRenderer = new OGLTextRenderer(width, height);
+
+        // Audio FFT
+        audioFFT = new AudioFFT();
+        audioFFT.start();
     }
 
-    void createGridBuffers() {
-        int rows = 64;
-        int cols = 64;
+    void createDiscBuffers() {
+        int rings = 128;
+        int sectors = 256;
+        float maxRadius = 5f;
 
-        // Vertex data: position (x, y, z) + uv (u, v) = 5 floats per vertex
-        float[] verts = new float[rows * cols * 5];
-        for (int r = 0; r < rows; r++) {
-            for (int c = 0; c < cols; c++) {
-                int i = (r * cols + c) * 5;
-                verts[i]     = (float) c / (cols - 1) * 10f - 5f;
+        // polar disc: position (x, 0, z) + uv (radius, angle)
+        float[] verts = new float[rings * sectors * 5];
+        for (int r = 0; r < rings; r++) {
+            float radius = (float) r / (rings - 1) * maxRadius;
+            for (int s = 0; s < sectors; s++) {
+                float angle = (float) s / sectors * (float) (2 * Math.PI);
+                int i = (r * sectors + s) * 5;
+                verts[i]     = radius * (float) Math.cos(angle);
                 verts[i + 1] = 0f;
-                verts[i + 2] = (float) r / (rows - 1) * 10f - 5f;
-                verts[i + 3] = (float) c / (cols - 1);
-                verts[i + 4] = (float) r / (rows - 1);
+                verts[i + 2] = radius * (float) Math.sin(angle);
+                verts[i + 3] = radius / maxRadius;          // u = radius
+                verts[i + 4] = (float) s / sectors;         // v = angle
             }
         }
 
-        // 2 triangles per cell = 6 indices per cell
-        int[] indices = new int[(rows - 1) * (cols - 1) * 6];
+        // 2 triangles per quad, sectors wrap around
+        int[] indices = new int[(rings - 1) * sectors * 6];
         int idx = 0;
-        for (int r = 0; r < rows - 1; r++) {
-            for (int c = 0; c < cols - 1; c++) {
-                int topLeft = r * cols + c;
-                indices[idx++] = topLeft;
-                indices[idx++] = topLeft + 1;
-                indices[idx++] = topLeft + cols;
-                indices[idx++] = topLeft + 1;
-                indices[idx++] = topLeft + cols + 1;
-                indices[idx++] = topLeft + cols;
+        for (int r = 0; r < rings - 1; r++) {
+            for (int s = 0; s < sectors; s++) {
+                int nextS = (s + 1) % sectors;
+                int cur      = r * sectors + s;
+                int curNext  = r * sectors + nextS;
+                int ring     = (r + 1) * sectors + s;
+                int ringNext = (r + 1) * sectors + nextS;
+
+                indices[idx++] = cur;
+                indices[idx++] = curNext;
+                indices[idx++] = ring;
+                indices[idx++] = curNext;
+                indices[idx++] = ringNext;
+                indices[idx++] = ring;
             }
         }
 
@@ -228,9 +246,9 @@ public class Main {
                 new OGLBuffers.Attrib("inUV", 2)
         };
 
-        gridBuffers = new OGLBuffers(verts, attribs, indices);
-        System.out.println("Grid created: " + rows + "x" + cols
-                + " (" + (indices.length / 3) + " triangles)");
+        discBuffers = new OGLBuffers(verts, attribs, indices);
+        System.out.println("Disc created: " + rings + " rings x " + sectors
+                + " sectors (" + (indices.length / 3) + " triangles)");
     }
 
     private void loop() {
@@ -239,10 +257,16 @@ public class Main {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             glUseProgram(shaderProgram);
+            float time = (float) glfwGetTime();
 
             // MVP matrix
             glUniformMatrix4fv(locMat, false,
                     ToFloatArray.convert(cam.getViewMatrix().mul(proj)));
+
+            // FFT data
+            glUniform1fv(locFFT, audioFFT.getBins());
+            glUniform1f(locAmplitude, amplitude);
+            glUniform1f(locTime, time);
 
             // Wireframe
             if (wireframe) {
@@ -251,14 +275,16 @@ public class Main {
                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
             }
 
-            // Draw grid
-            gridBuffers.draw(GL_TRIANGLES, shaderProgram);
+            // Draw disc
+            discBuffers.draw(GL_TRIANGLES, shaderProgram);
 
             // HUD text
-            String text = "Audio-Reactive Topography | WASD: move | Mouse: look"
-                    + " | Tab: wireframe [" + (wireframe ? "ON" : "OFF") + "]";
+            String text = "WASD: move | Tab: wireframe ["
+                    + (wireframe ? "ON" : "OFF") + "] | +/-: amp ["
+                    + String.format("%.1f", amplitude) + "] | M: audio";
             textRenderer.addStr2D(3, 20, text);
-            textRenderer.addStr2D(width - 220, height - 3, "Marek Fadrny | PGRF2 2025/26");
+            textRenderer.addStr2D(3, 35, "Audio: " + audioFFT.getDeviceName());
+            textRenderer.addStr2D(width - 180, height - 3, "Marek Fadrny | PGRF2 2025/26");
 
             glfwSwapBuffers(window);
             glfwPollEvents();
@@ -274,6 +300,7 @@ public class Main {
         } catch (Throwable t) {
             t.printStackTrace();
         } finally {
+            if (audioFFT != null) audioFFT.stop();
             glDeleteProgram(shaderProgram);
             glfwTerminate();
             glfwSetErrorCallback(null).free();

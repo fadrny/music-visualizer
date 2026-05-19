@@ -40,3 +40,6 @@ build/
 
 src2/
 libs/*
+
+### Spotify ###
+spotify.properties

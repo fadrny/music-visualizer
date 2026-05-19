@@ -2,15 +2,57 @@
 in float vHeight;
 in vec2 vUV;
 in float vRadius;
+in vec2 vLocalXZ;
 
 out vec4 FragColor;
+
+uniform sampler2D uAlbumArt;
+uniform int uHasAlbumArt;
+uniform float uMaxRadius;
 
 void main() {
     float radius = vRadius;
     float angle = vUV.y;
 
+    // Album art label
+    float labelRadius = 0.20;
+    float labelEdge = 0.015; // smooth transition width
+
+    if (uHasAlbumArt == 1 && radius < labelRadius + labelEdge) {
+        // Compute UV from local-space position
+        float effectiveRadius = uMaxRadius * labelRadius;
+        vec2 uv = vLocalXZ / (effectiveRadius * 2.0) + 0.5;
+
+        // Circular mask
+        float dist = length(vLocalXZ) / effectiveRadius;
+        float circleMask = 1.0 - smoothstep(0.95, 1.0, dist);
+
+        // Center hole
+        float holeMask = smoothstep(0.005, 0.05, radius);
+
+        // Sample album art
+        vec3 artColor = texture(uAlbumArt, uv).rgb;
+
+        // Blend factor: full art inside label, smooth transition to vinyl at edge
+        float labelBlend = (1.0 - smoothstep(labelRadius - labelEdge, labelRadius + labelEdge, radius))
+                           * circleMask * holeMask;
+
+        if (labelBlend > 0.01) {
+            // Vinyl color underneath
+            float h = clamp(vHeight * 0.35, 0.0, 1.0);
+            vec3 c0 = vec3(0.02, 0.0, 0.06);
+            vec3 c1 = vec3(0.15, 0.02, 0.35);
+            vec3 vinylColor = mix(c0, c1, h / 0.15);
+
+            // 50% transparent art over vinyl, with smooth edge
+            vec3 finalColor = mix(vinylColor, artColor, labelBlend * 0.2);
+            FragColor = vec4(finalColor, 1.0);
+            return;
+        }
+    }
+
     // center hole
-    float centerHole = smoothstep(0.03, 0.10, radius);
+    float centerHole = smoothstep(0.015, 0.04, radius);
 
     // wider dynamic range
     float h = clamp(vHeight * 0.35, 0.0, 1.0);

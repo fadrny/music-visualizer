@@ -84,6 +84,19 @@ Or open the project in your favorite Java IDE (IntelliJ IDEA, Eclipse, or VS Cod
 
 ---
 
+## Third-Party Libraries & Licensing
+
+This project utilizes several external libraries that are included in this repo for convenience. Please note that:
+*   **LWJGL 3 (Lightweight Java Game Library)** is distributed under the [BSD License](https://www.lwjgl.org/license).
+*   The following external libraries are used for academic/educational purposes:
+    *   [transforms](https://gitlab.com/honza.vanek/transforms) (by Jan Vaněk)
+    *   [lwjgl-utils](https://gitlab.com/Bruno.Jezek/lwjgl-utils) (by Bruno Ježek)
+    
+    These educational libraries are **not** part of my custom project source code. Any use, distribution, or modification of these libraries is governed strictly by their respective author's licenses and academic guidelines.
+
+---
+
 *Developed by Marek Fadrný | FIM UHK PGRF2 2025/26*
 
 *While working on this project, coding assisting tools leveraging LLMs were used - namely GitHub Copilot and GitHub Copilot Chat*
+

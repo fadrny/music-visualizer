@@ -2,6 +2,6 @@
 name = "music-visualizer"
 version = "1.0.0"
 edition = "2021"
-authors = ["Marek Fadrny"]
+authors = ["Marek Fadrný"]
 
 [dependencies]

@@ -16,7 +16,7 @@ mod tests {
     #[test]
     fn startup_message_mentions_rust_rewrite() {
         let message = startup_message();
-        assert!(message.contains("Vinyl Audio Visualizer"));
+        assert!(message.contains(APP_NAME));
         assert!(message.contains("Rust rewrite"));
     }
 }

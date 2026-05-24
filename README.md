@@ -1,6 +1,6 @@
 # Vinyl Audio Visualizer
 
-An interactive 3D audio-reactive music visualizer built with **Java**, **OpenGL (LWJGL 3)**, and **TarsosDSP**. 
+An interactive 3D audio-reactive music visualizer currently being rewritten in **Rust**.
 
 The application captures real-time audio streams (via your microphone or system loopback) and applies a Fast Fourier Transform (FFT) to deform the topography of a 3D polar circular grid resembling a classic vinyl record. In addition, it integrates with the **Spotify Web API** using the secure OAuth PKCE flow to dynamically pull currently playing track information and map the active song's album art directly onto the rotating vinyl's label.
 
@@ -34,8 +34,8 @@ The application captures real-time audio streams (via your microphone or system 
 
 ## Prerequisites
 
-*   **Java Development Kit (JDK)**: JDK 21 or later.
-*   **Maven**: To manage dependencies and build the project.
+*   **Rust Toolchain**: Install via [rustup](https://rustup.rs/) (stable channel).
+*   **Cargo**: Bundled with Rust and used to build/run the rewrite baseline.
 *   **Audio Source**: Working system audio with recording capability.
 
 ---
@@ -73,17 +73,13 @@ To fetch live cover art and track metadata, you need to provide your own Spotify
 
 ## Building & Running
 
-This project uses local custom-built LWJGL binaries supplied in the `libs/` directory via Maven's `system` scope. By default, Maven's `exec:java` runtime classpath excludes `system` scoped dependencies, which can lead to a `NoClassDefFoundError` for classes like `GLFWCursorPosCallbackI`.
-
-Pre-configured the `exec-maven-plugin` inside `pom.xml` to set the classpath scope to `compile` (which forces Maven to include local system-scope dependencies). 
-
-You can now build and run the application simply by executing:
+Build and run the Rust rewrite baseline with:
 
 ```bash
-mvn clean compile exec:java
+cargo run
 ```
 
-Or open the project in your favorite Java IDE (IntelliJ IDEA, Eclipse, or VS Code) and run the `Main` class directly.
+Legacy Java implementation is still available in `src/main/java` while the rewrite progresses.
 
 ---
 
@@ -102,4 +98,3 @@ This project utilizes several external libraries that are included in this repo 
 *Developed by Marek Fadrný | FIM UHK PGRF2 2025/26*
 
 *While working on this project, coding assisting tools leveraging LLMs were used - namely GitHub Copilot and GitHub Copilot Chat*
-

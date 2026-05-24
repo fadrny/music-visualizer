@@ -10,6 +10,7 @@ uniform float uTime;
 out float vHeight;
 out vec2 vUV;
 out float vRadius;
+out vec2 vLocalXZ;
 
 void main() {
     float radius = inUV.x;
@@ -44,5 +45,6 @@ void main() {
     vHeight = y;
     vUV = vec2(radius, angle);
     vRadius = radius;
+    vLocalXZ = vec2(inPosition.x, inPosition.z);
     gl_Position = mat * vec4(rx, y, rz, 1.0);
 }

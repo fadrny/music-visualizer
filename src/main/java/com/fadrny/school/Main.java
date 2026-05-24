@@ -16,13 +16,16 @@ import transforms.Mat4;
 import transforms.Mat4PerspRH;
 import transforms.Vec3D;
 
+import java.nio.ByteBuffer;
 import java.nio.DoubleBuffer;
 import java.nio.IntBuffer;
 
 import static org.lwjgl.glfw.Callbacks.*;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL13.*;
 import static org.lwjgl.opengl.GL33.*;
+import static org.lwjgl.stb.STBImage.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
 
@@ -48,6 +51,7 @@ public class Main {
     OGLTextRenderer textRenderer;
     int shaderProgram;
     int locMat, locFFT, locAmplitude, locTime;
+    int locAlbumArt, locHasAlbumArt, locMaxRadius;
 
     // Camera + Projection
     Camera cam = new Camera();
@@ -56,9 +60,16 @@ public class Main {
     // Audio
     AudioFFT audioFFT;
 
+    // Spotify
+    SpotifyClient spotifyClient;
+    boolean spotifyMode = false;
+    int albumArtTextureId = 0;
+    boolean hasAlbumArt = false;
+
     // State
     boolean wireframe = false;
     float amplitude = 1.5f;
+    static final float MAX_RADIUS = 5f;
 
     private void init() {
         GLFWErrorCallback.createPrint(System.err).set();
@@ -91,6 +102,7 @@ public class Main {
                     case GLFW_KEY_KP_SUBTRACT:
                     case GLFW_KEY_MINUS: amplitude = Math.max(amplitude - 0.1f, 0f); break;
                     case GLFW_KEY_M: audioFFT.nextDevice(); break;
+                    case GLFW_KEY_O: toggleSpotify(); break;
                 }
             }
         });
@@ -179,6 +191,9 @@ public class Main {
         locFFT = glGetUniformLocation(shaderProgram, "uFFT");
         locAmplitude = glGetUniformLocation(shaderProgram, "uAmplitude");
         locTime = glGetUniformLocation(shaderProgram, "uTime");
+        locAlbumArt = glGetUniformLocation(shaderProgram, "uAlbumArt");
+        locHasAlbumArt = glGetUniformLocation(shaderProgram, "uHasAlbumArt");
+        locMaxRadius = glGetUniformLocation(shaderProgram, "uMaxRadius");
 
         // Camera
         cam = cam.withPosition(new Vec3D(4, 6, 3))
@@ -201,22 +216,71 @@ public class Main {
         audioFFT.start();
     }
 
+    private void toggleSpotify() {
+        spotifyMode = !spotifyMode;
+        if (spotifyMode) {
+            if (spotifyClient == null) {
+                spotifyClient = new SpotifyClient();
+            }
+            if (!spotifyClient.isConnected() && !spotifyClient.isAuthInProgress()) {
+                spotifyClient.startAuth();
+            }
+        }
+        System.out.println("[Spotify] Mode " + (spotifyMode ? "ON" : "OFF"));
+    }
+
+    // Upload JPEG/PNG bytes as an OpenGL texture (decodes via STB).
+    // Must be called on the GL thread.
+    private void uploadAlbumArtTexture(byte[] imageBytes) {
+        ByteBuffer imageBuf = BufferUtils.createByteBuffer(imageBytes.length);
+        imageBuf.put(imageBytes);
+        imageBuf.flip();
+
+        IntBuffer w = BufferUtils.createIntBuffer(1);
+        IntBuffer h = BufferUtils.createIntBuffer(1);
+        IntBuffer comp = BufferUtils.createIntBuffer(1);
+
+        ByteBuffer pixels = stbi_load_from_memory(imageBuf, w, h, comp, 4);
+        if (pixels == null) {
+            System.err.println("[Spotify] Failed to decode album art: " + stbi_failure_reason());
+            return;
+        }
+
+        // Delete old texture if exists
+        if (albumArtTextureId != 0) {
+            glDeleteTextures(albumArtTextureId);
+        }
+
+        albumArtTextureId = glGenTextures();
+        glBindTexture(GL_TEXTURE_2D, albumArtTextureId);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w.get(0), h.get(0), 0,
+                GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        stbi_image_free(pixels);
+        hasAlbumArt = true;
+
+        System.out.println("[Spotify] Album art texture uploaded [" + w.get(0) + "x" + h.get(0) + "]");
+    }
+
     void createDiscBuffers() {
         int rings = 128;
         int sectors = 256;
-        float maxRadius = 5f;
 
         // polar disc: position (x, 0, z) + uv (radius, angle)
         float[] verts = new float[rings * sectors * 5];
         for (int r = 0; r < rings; r++) {
-            float radius = (float) r / (rings - 1) * maxRadius;
+            float radius = (float) r / (rings - 1) * MAX_RADIUS;
             for (int s = 0; s < sectors; s++) {
                 float angle = (float) s / sectors * (float) (2 * Math.PI);
                 int i = (r * sectors + s) * 5;
                 verts[i]     = radius * (float) Math.cos(angle);
                 verts[i + 1] = 0f;
                 verts[i + 2] = radius * (float) Math.sin(angle);
-                verts[i + 3] = radius / maxRadius;          // u = radius
+                verts[i + 3] = radius / MAX_RADIUS;          // u = radius
                 verts[i + 4] = (float) s / sectors;         // v = angle
             }
         }
@@ -268,6 +332,26 @@ public class Main {
             glUniform1f(locAmplitude, amplitude);
             glUniform1f(locTime, time);
 
+            // Spotify: check for new album art (must be on GL thread)
+            if (spotifyMode && spotifyClient != null) {
+                byte[] newArt = spotifyClient.consumeNewAlbumArt();
+                if (newArt != null) {
+                    uploadAlbumArtTexture(newArt);
+                }
+            }
+
+            // Album art texture
+            boolean showArt = spotifyMode && hasAlbumArt && albumArtTextureId != 0;
+            if (showArt) {
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D, albumArtTextureId);
+                glUniform1i(locAlbumArt, 1);
+                glUniform1i(locHasAlbumArt, 1);
+            } else {
+                glUniform1i(locHasAlbumArt, 0);
+            }
+            glUniform1f(locMaxRadius, MAX_RADIUS);
+
             // Wireframe
             if (wireframe) {
                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -278,12 +362,34 @@ public class Main {
             // Draw disc
             discBuffers.draw(GL_TRIANGLES, shaderProgram);
 
+            // Reset texture state
+            if (showArt) {
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D, 0);
+                glActiveTexture(GL_TEXTURE0);
+            }
+
             // HUD text
             String text = "WASD: move | Tab: wireframe ["
                     + (wireframe ? "ON" : "OFF") + "] | +/-: amp ["
-                    + String.format("%.1f", amplitude) + "] | M: audio";
+                    + String.format("%.1f", amplitude) + "] | M: audio | O: spotify ["
+                    + (spotifyMode ? "ON" : "OFF") + "]";
             textRenderer.addStr2D(3, 20, text);
             textRenderer.addStr2D(3, 35, "Audio: " + audioFFT.getDeviceName());
+
+            // Spotify track info
+            if (spotifyMode) {
+                if (spotifyClient != null && spotifyClient.isConnected() && spotifyClient.hasTrack()) {
+                    String trackInfo = "+ " + spotifyClient.getTrackName()
+                            + " - " + spotifyClient.getArtistName();
+                    textRenderer.addStr2D(3, height - 10, trackInfo);
+                } else if (spotifyClient != null && spotifyClient.isAuthInProgress()) {
+                    textRenderer.addStr2D(3, height - 10, "Spotify: connecting...");
+                } else if (spotifyClient != null && spotifyClient.isConnected()) {
+                    textRenderer.addStr2D(3, height - 10, "Spotify: nothing playing");
+                }
+            }
+
             textRenderer.addStr2D(width - 180, height - 3, "Marek Fadrny | PGRF2 2025/26");
 
             glfwSwapBuffers(window);
@@ -301,6 +407,8 @@ public class Main {
             t.printStackTrace();
         } finally {
             if (audioFFT != null) audioFFT.stop();
+            if (spotifyClient != null) spotifyClient.stop();
+            if (albumArtTextureId != 0) glDeleteTextures(albumArtTextureId);
             glDeleteProgram(shaderProgram);
             glfwTerminate();
             glfwSetErrorCallback(null).free();

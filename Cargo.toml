@@ -1,0 +1,36 @@
+[package]
+name = "music-visualizer"
+version = "1.0.0"
+edition = "2021"
+authors = ["Marek Fadrny"]
+description = "Vinyl Audio Visualizer - Rust port"
+
+[[bin]]
+name = "music-visualizer"
+path = "src-rust/main.rs"
+
+[dependencies]
+winit = "0.29"
+glutin = "0.31"
+glutin-winit = "0.4"
+raw-window-handle = "0.5"
+glow = "0.13"
+glam = "0.27"
+cpal = "0.15"
+rustfft = "6.2"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+glyph_brush = "0.7"
+ab_glyph = "0.2"
+tiny_http = "0.12"
+ureq = { version = "2.10", features = ["tls", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "2"
+base64 = "0.22"
+sha2 = "0.10"
+rand = "0.8"
+opener = "0.7"
+
+[profile.release]
+opt-level = 3
+lto = "thin"

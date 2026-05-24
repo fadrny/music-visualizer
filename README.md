@@ -85,6 +85,30 @@ mvn clean compile exec:java
 
 Or open the project in your favorite Java IDE (IntelliJ IDEA, Eclipse, or VS Code) and run the `Main` class directly.
 
+### Rust port (`rust-rewrite` branch)
+
+A 1:1 Rust port lives alongside the Java sources in [`src-rust/`](src-rust/). Same window, same shaders, same controls, same Spotify flow — only the host language changes.
+
+Requirements:
+
+*   **Rust 1.75+** (install via [rustup](https://rustup.rs/)).
+*   On Windows the **GNU toolchain** is the easiest path — it doesn't need the Visual Studio Build Tools:
+    ```powershell
+    rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal
+    rustup default stable-x86_64-pc-windows-gnu
+    winget install BrechtSanders.WinLibs.POSIX.UCRT   # provides gcc/dlltool
+    ```
+    Make sure `mingw64\bin` from WinLibs is on your `PATH`.
+*   The MSVC toolchain works too if you already have Visual Studio Build Tools installed.
+
+Build and run:
+
+```bash
+cargo run --release
+```
+
+The Rust binary uses the same `spotify.properties` file in the project root and the same `O` keybinding to launch the OAuth PKCE flow.
+
 ---
 
 ## Third-Party Libraries & Licensing

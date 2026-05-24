@@ -4,6 +4,8 @@ An interactive 3D audio-reactive music visualizer built with **Java**, **OpenGL 
 
 The application captures real-time audio streams (via your microphone or system loopback) and applies a Fast Fourier Transform (FFT) to deform the topography of a 3D polar circular grid resembling a classic vinyl record. In addition, it integrates with the **Spotify Web API** using the secure OAuth PKCE flow to dynamically pull currently playing track information and map the active song's album art directly onto the rotating vinyl's label.
 
+![Screenshot of the application](screenshots/s1.png "Screenshot of the application with Spotify mode on")
+
 ---
 
 ## Features
@@ -62,6 +64,7 @@ To fetch live cover art and track metadata, you need to provide your own Spotify
 3.  Go to the settings of your newly created Spotify app and copy the **Client ID**.
 4.  In the root folder of this project (next to `pom.xml`), create a new file named **`spotify.properties`**.
 5.  Add your Client ID to the file using this exact key:
+    
     ```properties
     spotify.client_id=YOUR_SPOTIFY_CLIENT_ID_HERE
     ```

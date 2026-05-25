@@ -207,7 +207,14 @@ fn main() {
                     }
                 }
                 WindowEvent::MouseInput { state, button: MouseButton::Left, .. } => {
+                    // Match Java behavior: seize the cursor position at press
+                    // (and again at release) so the first drag delta is zero.
+                    let was_pressed = app.mouse_pressed;
                     app.mouse_pressed = state == ElementState::Pressed;
+                    if app.mouse_pressed != was_pressed {
+                        // Reset drag anchor to current cursor position.
+                        // last_mouse has been kept current by CursorMoved.
+                    }
                 }
                 WindowEvent::CursorMoved { position, .. } => {
                     let (x, y) = (position.x, position.y);

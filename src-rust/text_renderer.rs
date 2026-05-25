@@ -45,6 +45,7 @@ pub struct TextRenderer {
     glyphs: HashMap<char, GlyphInfo>,
     line_height: f32,
     ascent: f32,
+    space_advance: f32,
     queue: Vec<f32>,
     scale: PxScale,
     font: FontArc,
@@ -57,7 +58,8 @@ impl TextRenderer {
         let font = load_font();
         let scale = PxScale::from(14.0);
 
-        let (texture, atlas_w, atlas_h, glyphs, line_height, ascent) = build_atlas(gl, &font, scale);
+        let (texture, atlas_w, atlas_h, glyphs, line_height, ascent, space_advance) =
+            build_atlas(gl, &font, scale);
 
         let program = crate::shader::load_program(gl, VS, FS);
 
@@ -76,7 +78,8 @@ impl TextRenderer {
 
         Self {
             program, vao, vbo, texture, atlas_w, atlas_h,
-            glyphs, line_height, ascent, queue: Vec::new(),
+            glyphs, line_height, ascent, space_advance,
+            queue: Vec::new(),
             scale, font, width, height,
         }
     }
@@ -88,13 +91,16 @@ impl TextRenderer {
         let baseline_y = y as f32;
         for ch in text.chars() {
             if ch == ' ' {
-                let adv = self.glyphs.get(&'n').map(|g| g.advance).unwrap_or(6.0);
-                pen_x += adv;
+                pen_x += self.space_advance;
                 continue;
             }
-            let Some(g) = self.glyphs.get(&ch) else {
-                pen_x += 6.0;
-                continue;
+            // Use a fallback glyph for characters we didn't bake.
+            let g = match self.glyphs.get(&ch) {
+                Some(g) => g,
+                None => match self.glyphs.get(&'?') {
+                    Some(g) => g,
+                    None => { pen_x += self.space_advance; continue; }
+                },
             };
             let x0 = pen_x + g.bearing_x;
             let y0 = baseline_y + g.bearing_y; // bearing_y is offset from baseline (negative = above)
@@ -152,21 +158,26 @@ unsafe fn build_atlas(
     gl: &glow::Context,
     font: &FontArc,
     scale: PxScale,
-) -> (glow::Texture, u32, u32, HashMap<char, GlyphInfo>, f32, f32) {
+) -> (glow::Texture, u32, u32, HashMap<char, GlyphInfo>, f32, f32, f32) {
     let scaled = font.as_scaled(scale);
     let ascent = scaled.ascent();
     let line_height = scaled.height() + scaled.line_gap();
+    let space_advance = scaled.h_advance(font.glyph_id(' '));
 
-    let atlas_w: u32 = 512;
-    let mut atlas_h: u32 = 128;
+    let atlas_w: u32 = 1024;
+    let mut atlas_h: u32 = 256;
     let mut pixels = vec![0u8; (atlas_w * atlas_h) as usize];
     let mut x: u32 = 1;
     let mut y: u32 = 1;
     let mut row_h: u32 = 0;
     let mut glyphs: HashMap<char, GlyphInfo> = HashMap::new();
 
-    for code in 33u32..127u32 {
-        let ch = char::from_u32(code).unwrap();
+    // ASCII printable (33..127) + Latin-1 Supplement (160..256) + Latin Extended-A (256..384, covers Czech/Polish/etc) + a few common punctuation chars.
+    let ranges: &[std::ops::Range<u32>] = &[33..127, 160..384, 0x2010..0x2020];
+    let codes = ranges.iter().flat_map(|r| r.clone());
+
+    for code in codes {
+        let Some(ch) = char::from_u32(code) else { continue; };
         let glyph: Glyph = font.glyph_id(ch).with_scale(scale);
         let advance = scaled.h_advance(font.glyph_id(ch));
         let Some(outline) = font.outline_glyph(glyph) else {
@@ -227,7 +238,7 @@ unsafe fn build_atlas(
     gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_WRAP_S, glow::CLAMP_TO_EDGE as i32);
     gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_WRAP_T, glow::CLAMP_TO_EDGE as i32);
 
-    (texture, atlas_w, atlas_h, glyphs, line_height, ascent)
+    (texture, atlas_w, atlas_h, glyphs, line_height, ascent, space_advance)
 }
 
 fn load_font() -> FontArc {
